@@ -300,55 +300,9 @@ public int getCapacity() throws NoSuchFieldException {
 }
 ```
 
-### 8. Updated `Runner.java` — Use Factory
 
-**File:** `Runner.java`
 
-**Before:**
-```java
-static List<Object> aircrafts = Arrays.asList(
-    new PassengerPlane("A380"),
-    new Helicopter("H1"),
-    new PassengerDrone("HypaHype")
-);
-```
 
-**After:**
-```java
-static List<Aircraft> aircrafts = Arrays.asList(
-    AircraftFactory.createPassengerPlane("A380"),
-    AircraftFactory.createHelicopter("H1"),
-    AircraftFactory.createPassengerDrone("HypaHype")
-);
-```
-
-### 9. Updated Test Files
-
-**Files:** `ScenarioTest.java`, `ScheduleTest.java`
-
-All direct instantiations like `new Helicopter("H1")` replaced with:
-```java
-AircraftFactory.createHelicopter("H1")
-```
-
----
-
-## Summary of Changes
-
-| File | Change Type | Description |
-|------|-------------|-------------|
-| `Aircraft.java` | **New** | Common interface for all aircraft types |
-| `AircraftFactory.java` | **New** | Factory for creating aircraft instances |
-| `PassengerPlane.java` | **Modified** | Implements `Aircraft`, added getters |
-| `Helicopter.java` | **Modified** | Implements `Aircraft`, added `getCrewCapacity()` |
-| `PassengerDrone.java` | **Modified** | Implements `Aircraft`, added all required methods |
-| `Flight.java` | **Modified** | Uses `Aircraft` type, removed `instanceof` checks |
-| `ScheduledFlight.java` | **Modified** | Simplified to use polymorphic calls |
-| `Runner.java` | **Modified** | Uses `AircraftFactory` for creation |
-| `ScenarioTest.java` | **Modified** | Uses `AircraftFactory` for test setup |
-| `ScheduleTest.java` | **Modified** | Uses `AircraftFactory` for test setup |
-
----
 
 # Chain of Responsibility Pattern
 
@@ -669,27 +623,3 @@ public class BankTransferPaymentHandler extends PaymentHandler {
     }
 }
 ```
-
-No changes to `FlightOrder` required!
-
----
-
-## Summary of Changes
-
-| File | Change Type | Description |
-|------|-------------|-------------|
-| `PaymentHandler.java` | **New** | Abstract handler base class with chain logic |
-| `CreditCardPaymentHandler.java` | **New** | Concrete handler for credit card payments |
-| `PayPalPaymentHandler.java` | **New** | Concrete handler for PayPal payments |
-| `FlightOrder.java` | **Modified** | Delegates payment to handlers, removed duplicate logic |
-
----
-
-## Lines of Code Comparison
-
-| Metric | Before | After |
-|--------|--------|-------|
-| `FlightOrder.java` payment methods | ~50 lines | ~15 lines |
-| Payment logic duplication | High | None |
-| Adding new payment method | Modify `FlightOrder` | Create new handler class |
-| Testability | Hard | Easy (test handlers independently) |
