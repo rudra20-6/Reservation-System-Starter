@@ -437,3 +437,259 @@ Each handler decides whether to process the request or pass it to the next handl
 ### **After Chain of Responsibility Pattern**
 
 ![After Chain of Responsibility](./COR_after.png)
+
+---
+
+## Code Changes
+
+### 1. Created `PaymentHandler` Abstract Class
+
+**New File:** `flight/reservation/payment/PaymentHandler.java`
+
+```java
+package flight.reservation.payment;
+
+import flight.reservation.order.FlightOrder;
+
+public abstract class PaymentHandler {
+    
+    protected PaymentHandler nextHandler;
+    
+    public PaymentHandler setNext(PaymentHandler nextHandler) {
+        this.nextHandler = nextHandler;
+        return nextHandler;
+    }
+    
+    public boolean handle(FlightOrder order) throws IllegalStateException {
+        if (canHandle()) {
+            return process(order);
+        } else if (nextHandler != null) {
+            return nextHandler.handle(order);
+        }
+        throw new IllegalStateException("No payment handler could process this request.");
+    }
+    
+    protected abstract boolean canHandle();
+    
+    protected abstract boolean process(FlightOrder order) throws IllegalStateException;
+}
+```
+
+### 2. Created `CreditCardPaymentHandler`
+
+**New File:** `flight/reservation/payment/CreditCardPaymentHandler.java`
+
+```java
+package flight.reservation.payment;
+
+import flight.reservation.order.FlightOrder;
+
+public class CreditCardPaymentHandler extends PaymentHandler {
+    
+    private final CreditCard creditCard;
+    
+    public CreditCardPaymentHandler(CreditCard creditCard) {
+        this.creditCard = creditCard;
+    }
+    
+    @Override
+    protected boolean canHandle() {
+        return creditCard != null && creditCard.isValid();
+    }
+    
+    @Override
+    protected boolean process(FlightOrder order) throws IllegalStateException {
+        if (order.isClosed()) {
+            return true;
+        }
+        
+        if (!canHandle()) {
+            throw new IllegalStateException("Payment information is not set or not valid.");
+        }
+        
+        System.out.println("Paying " + order.getPrice() + " using Credit Card.");
+        double remainingAmount = creditCard.getAmount() - order.getPrice();
+        
+        if (remainingAmount < 0) {
+            throw new IllegalStateException("Card limit reached");
+        }
+        
+        creditCard.setAmount(remainingAmount);
+        order.setClosed();
+        return true;
+    }
+}
+```
+
+### 3. Created `PayPalPaymentHandler`
+
+**New File:** `flight/reservation/payment/PayPalPaymentHandler.java`
+
+```java
+package flight.reservation.payment;
+
+import flight.reservation.order.FlightOrder;
+
+public class PayPalPaymentHandler extends PaymentHandler {
+    
+    private final String email;
+    private final String password;
+    
+    public PayPalPaymentHandler(String email, String password) {
+        this.email = email;
+        this.password = password;
+    }
+    
+    @Override
+    protected boolean canHandle() {
+        return email != null && password != null && 
+               email.equals(Paypal.DATA_BASE.get(password));
+    }
+    
+    @Override
+    protected boolean process(FlightOrder order) throws IllegalStateException {
+        if (order.isClosed()) {
+            return true;
+        }
+        
+        if (!canHandle()) {
+            throw new IllegalStateException("Payment information is not set or not valid.");
+        }
+        
+        System.out.println("Paying " + order.getPrice() + " using PayPal.");
+        order.setClosed();
+        return true;
+    }
+}
+```
+
+### 4. Refactored `FlightOrder.java` — Delegates to Payment Handlers
+
+**File:** `flight/reservation/order/FlightOrder.java`
+
+**Before:**
+```java
+public boolean processOrderWithCreditCard(CreditCard creditCard) throws IllegalStateException {
+    if (isClosed()) {
+        return true;
+    }
+    if (!cardIsPresentAndValid(creditCard)) {
+        throw new IllegalStateException("Payment information is not set or not valid.");
+    }
+    boolean isPaid = payWithCreditCard(creditCard, this.getPrice());
+    if (isPaid) {
+        this.setClosed();
+    }
+    return isPaid;
+}
+
+public boolean processOrderWithPayPal(String email, String password) throws IllegalStateException {
+    if (isClosed()) {
+        return true;
+    }
+    if (email == null || password == null || !email.equals(Paypal.DATA_BASE.get(password))) {
+        throw new IllegalStateException("Payment information is not set or not valid.");
+    }
+    boolean isPaid = payWithPayPal(email, password, this.getPrice());
+    if (isPaid) {
+        this.setClosed();
+    }
+    return isPaid;
+}
+
+public boolean payWithCreditCard(CreditCard card, double amount) throws IllegalStateException {
+    // ... 15+ lines of payment logic
+}
+
+public boolean payWithPayPal(String email, String password, double amount) throws IllegalStateException {
+    // ... payment logic
+}
+```
+
+**After:**
+```java
+/**
+ * Process payment using Chain of Responsibility pattern.
+ */
+public boolean processPayment(PaymentHandler handler) throws IllegalStateException {
+    return handler.handle(this);
+}
+
+public boolean processOrderWithCreditCard(CreditCard creditCard) throws IllegalStateException {
+    PaymentHandler handler = new CreditCardPaymentHandler(creditCard);
+    return processPayment(handler);
+}
+
+public boolean processOrderWithPayPal(String email, String password) throws IllegalStateException {
+    PaymentHandler handler = new PayPalPaymentHandler(email, password);
+    return processPayment(handler);
+}
+```
+
+### 5. Example: Chaining Multiple Payment Handlers
+
+With the new pattern, you can easily chain payment methods:
+
+```java
+// Try credit card first, then fall back to PayPal
+PaymentHandler creditCardHandler = new CreditCardPaymentHandler(creditCard);
+PaymentHandler paypalHandler = new PayPalPaymentHandler(email, password);
+
+creditCardHandler.setNext(paypalHandler);
+
+// This will try credit card first, if it fails, try PayPal
+order.processPayment(creditCardHandler);
+```
+
+### 6. Adding New Payment Methods
+
+To add a new payment method (e.g., Bank Transfer), simply create a new handler:
+
+```java
+public class BankTransferPaymentHandler extends PaymentHandler {
+    private final String accountNumber;
+    private final String routingNumber;
+    
+    public BankTransferPaymentHandler(String accountNumber, String routingNumber) {
+        this.accountNumber = accountNumber;
+        this.routingNumber = routingNumber;
+    }
+    
+    @Override
+    protected boolean canHandle() {
+        return accountNumber != null && routingNumber != null;
+    }
+    
+    @Override
+    protected boolean process(FlightOrder order) throws IllegalStateException {
+        // Bank transfer logic
+        System.out.println("Paying " + order.getPrice() + " using Bank Transfer.");
+        order.setClosed();
+        return true;
+    }
+}
+```
+
+No changes to `FlightOrder` required!
+
+---
+
+## Summary of Changes
+
+| File | Change Type | Description |
+|------|-------------|-------------|
+| `PaymentHandler.java` | **New** | Abstract handler base class with chain logic |
+| `CreditCardPaymentHandler.java` | **New** | Concrete handler for credit card payments |
+| `PayPalPaymentHandler.java` | **New** | Concrete handler for PayPal payments |
+| `FlightOrder.java` | **Modified** | Delegates payment to handlers, removed duplicate logic |
+
+---
+
+## Lines of Code Comparison
+
+| Metric | Before | After |
+|--------|--------|-------|
+| `FlightOrder.java` payment methods | ~50 lines | ~15 lines |
+| Payment logic duplication | High | None |
+| Adding new payment method | Modify `FlightOrder` | Create new handler class |
+| Testability | Hard | Easy (test handlers independently) |
