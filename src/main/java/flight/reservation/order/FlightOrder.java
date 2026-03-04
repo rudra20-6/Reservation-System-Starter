@@ -29,14 +29,9 @@ public class FlightOrder extends Order {
         boolean valid = true;
         valid = valid && !noFlyList.contains(customer.getName());
         valid = valid && passengerNames.stream().noneMatch(passenger -> noFlyList.contains(passenger));
-        valid = valid && flights.stream().allMatch(scheduledFlight -> {
-            try {
-                return scheduledFlight.getAvailableCapacity() >= passengerNames.size();
-            } catch (NoSuchFieldException e) {
-                e.printStackTrace();
-                return false;
-            }
-        });
+        valid = valid && flights.stream().allMatch(scheduledFlight -> 
+            scheduledFlight.getAvailableCapacity() >= passengerNames.size()
+        );
         return valid;
     }
 
