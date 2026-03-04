@@ -1,12 +1,15 @@
 package flight.reservation;
 
-import flight.reservation.flight.ScheduledFlight;
-import flight.reservation.order.FlightOrder;
-import flight.reservation.order.Order;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
+
+import flight.reservation.flight.ScheduledFlight;
+import flight.reservation.order.ConcreteFlightBuilder;
+import flight.reservation.order.FlightOrder;
+import flight.reservation.order.FlightOrderBuilder;
+import flight.reservation.order.FlightOrderDirector;
+import flight.reservation.order.Order;
 
 public class Customer {
 
@@ -24,14 +27,20 @@ public class Customer {
         if (!isOrderValid(passengerNames, flights)) {
             throw new IllegalStateException("Order is not valid");
         }
-        FlightOrder order = new FlightOrder(flights);
-        order.setCustomer(this);
-        order.setPrice(price);
+        
+        // Create passengers list
         List<Passenger> passengers = passengerNames
                 .stream()
                 .map(Passenger::new)
                 .collect(Collectors.toList());
-        order.setPassengers(passengers);
+        
+        // Use Builder pattern with Director
+        FlightOrderBuilder builder = new ConcreteFlightBuilder();
+        FlightOrderDirector director = new FlightOrderDirector(builder);
+        
+        FlightOrder order = director.constructOrder(flights, this, passengers, price);
+        
+        // Add passengers to scheduled flights
         order.getScheduledFlights().forEach(scheduledFlight -> scheduledFlight.addPassengers(passengers));
         orders.add(order);
         return order;
